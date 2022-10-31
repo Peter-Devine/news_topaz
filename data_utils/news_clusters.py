@@ -29,15 +29,28 @@ class NewsCluster:
         self.num_char_keywords = num_char_keywords
 
         self.num_char_headlines = num_char_headlines
-    
+        
+        # Get stats for the whole cluster
+        self.entire_age = self.__get_cluster_mean_age(cluster_id)
+        self.entire_size = self.__get_cluster_size(cluster_id)
+        self.entire_stats = self.__get_cluster_stats(cluster_id)
     
     def __get_characteristic_headlines(self, cluster_id):
         
-        clust_mask = self.news_df["cluster_ids"] == cluster_id
+        if cluster_id is None:
+            selected_news_df = self.news_df
+            selected_emb = self.news_emb
+            cluster_center = self.news_emb.mean(axis=0)
+        else:
+            clust_mask = self.news_df["cluster_ids"] == cluster_id
 
-        distances = cdist([self.news_cluster.cluster_centers_[cluster_id]], self.news_emb[clust_mask], metric="cosine")[0]
+            selected_news_df = self.news_df[clust_mask]
+            selected_emb = self.news_emb[clust_mask]
+            cluster_center = self.news_cluster.cluster_centers_[cluster_id]
 
-        sorted_headline_to_centroid = self.news_df.title.iloc[distances.argsort()].tolist()
+        distances = cdist([cluster_center], selected_emb, metric="cosine")[0]
+
+        sorted_headline_to_centroid = selected_news_df.title.iloc[distances.argsort()].tolist()
 
         # Take the top third of the characteristic headlines
         selected_len = int(len(sorted_headline_to_centroid) / 3)
@@ -50,11 +63,18 @@ class NewsCluster:
         return chosen_headlines
        
     def __get_cluster_keywords(self, cluster_id):
-        cluster_ids = self.__get_cluster_ids()
+        if cluster_id is None:
+            selected_news_df = self.news_df
+            selected_tfidf = self.tfidf_values
+        else:
+            clust_mask = self.news_df["cluster_ids"] == cluster_id
+
+            selected_news_df = self.news_df[clust_mask]
+            selected_tfidf = self.tfidf_values[clust_mask]
         
         clust_mask = self.news_df["cluster_ids"] == cluster_id
 
-        sorted_args = self.tfidf_values[clust_mask].sum(axis=0).argsort()
+        sorted_args = selected_tfidf.sum(axis=0).argsort()
         sorted_words = self.tfidf_words[sorted_args]
         
         # Get top (i.e. highest tf-idf score) keywords for this cluster
@@ -84,7 +104,13 @@ class NewsCluster:
             return f"{int(hours_age / hours_in_year)}y"
     
     def __get_cluster_mean_age(self, cluster_id):
-        clust_mask = self.news_df["cluster_ids"] == cluster_id
+        
+        if cluster_id is None:
+            selected_news_df = self.news_df
+        else:
+            clust_mask = self.news_df["cluster_ids"] == cluster_id
+
+            selected_news_df = self.news_df[clust_mask]
         
         dates = pd.to_datetime(self.news_df.loc[clust_mask, "pubDate"])        
         age_hours = (datetime.now() - dates) / np.timedelta64(1, 'h')
@@ -94,15 +120,40 @@ class NewsCluster:
         return self.__parse_age_to_readable(average_hours)
     
     def __get_cluster_size(self, cluster_id):
-        clust_mask = self.news_df["cluster_ids"] == cluster_id
-        return self.__parse_num_to_readable(clust_mask.sum())
+        if cluster_id is None:
+            clust_size = self.news_df.shape[0]
+        else:
+            clust_mask = self.news_df["cluster_ids"] == cluster_id
+            clust_size = clust_mask.sum()
         
-    def __get_cluster_stats(self, cluster_id):
-        raise Exception("Not implemented cluster keyword extraction")
+        return self.__parse_num_to_readable(clust_size)
         
-    def __get_all_cluster_news(self, cluster_id):
-        raise Exception("Not implemented cluster keyword extraction")
-
+    def __get_cluster_stats(self, cluster_id, stat_cols=["language", "source"], explode_cols=["countries"], n_stats=2):
+        if cluster_id is None:
+            selected_news_df = self.news_df
+        else:
+            clust_mask = self.news_df["cluster_ids"] == cluster_id
+            selected_news_df = self.news_df[clust_mask]
+        
+        cluster_stats = {}
+        
+        for stat_col in stat_cols:
+            cluster_stats[stat_col] = selected_news_df[stat_col].value_counts(normalize=True)[:n_stats].to_dict()
+            
+        for stat_col in explode_cols:
+            cluster_stats[stat_col] = selected_news_df[stat_col].explode().value_counts(normalize=True)[:n_stats].to_dict()
+            
+        return cluster_stats
+        
+    def __get_all_cluster_news(self, cluster_id, cols=[""]):
+        if cluster_id is None:
+            selected_news_df = self.news_df
+        else:
+            clust_mask = self.news_df["cluster_ids"] == cluster_id
+            selected_news_df = self.news_df[clust_mask]
+        
+        return selected_news_df.to_dict(orient="records")
+        
     def get_cluster_info(self):
         
         cluster_info = {}
@@ -116,31 +167,11 @@ class NewsCluster:
             cluster_info["stats"] = self.__get_cluster_stats(cluster_id)
             
             cluster_info["all_news"] = self.__get_all_cluster_news(cluster_id)
-
-            
     
-#     def get_cluster_sample(self, cluster_id=None, num_sampled=5):
-        
-#         cluster_ids = self.__get_cluster_ids(cluster_id)
+        return cluster_info
                 
-#         char_headlines_dict = {}
-        
-#         for individual_cluster_ids in cluster_ids:
-#             cluster_mask = self.news_df["cluster_ids"] == individual_cluster_ids
-            
-#             if cluster_mask.sum() < 1:
-#                 continue
-            
-#             char_headlines_dict[individual_cluster_ids] = self.news_df.loc[cluster_mask].sample(n = min(cluster_mask.sum(), num_sampled))
-        
-#         return char_headlines_dict
-
-    
     def get_subclusters(self, cluster_id, num_topics=5):
         
         cluster_mask = self.news_df["cluster_ids"] == cluster_id
         
         return NewsCluster(self.news_df[cluster_mask], self.news_emb[cluster_mask], num_topics)
-
-    
-    
