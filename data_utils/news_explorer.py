@@ -8,6 +8,7 @@ import sys
 
 from data_utils.news_downloader import NewsDownloader
 from data_utils.text_translator import TextTranslator
+from data_utils.news_clusters import NewsCluster
 
 class NewsExplorer:
     def __init__(self, source_lang="en"):

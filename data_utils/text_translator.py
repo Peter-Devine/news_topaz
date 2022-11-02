@@ -25,8 +25,15 @@ class TextTranslator:
             
             # translate source_lang to target_lang
             encoded_text = self.m2m_tokenizer(source_text_batch, return_tensors="pt", padding=True, truncation=True, max_length=self.max_len)
+            
+            # Put inputs onto GPU (if available)
             encoded_text = {key: tensor.to(self.device) for key, tensor in encoded_text.items()}
             generated_tokens = self.m2m_model.generate(**encoded_text, forced_bos_token_id=self.m2m_tokenizer.get_lang_id(target_lang))
+            
+            # Put inputs and outputs onto CPU
+            encoded_text = {key: tensor.to("cpu") for key, tensor in encoded_text.items()}
+            generated_tokens = generated_tokens.to("cpu")
+            
             translated_text_list.extend(self.m2m_tokenizer.batch_decode(generated_tokens, skip_special_tokens=True))
             
         return translated_text_list
