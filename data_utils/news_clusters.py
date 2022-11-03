@@ -33,6 +33,8 @@ class NewsCluster:
         self.tfidf_words = vectorizer.get_feature_names_out()
         self.tfidf_values, self.tfidf_words = self.__decorrelate_vocab(self.tfidf_values.toarray(), self.tfidf_words)
         self.num_char_keywords = num_char_keywords
+        
+        self.max_corr = 0.7
 
         self.num_char_headlines = num_char_headlines
         
@@ -60,10 +62,8 @@ class NewsCluster:
         # Re-sort vocab to align with new autocorr indices
         vocab = vocab[corr_mat_arg_sort]
 
-        print(encoding.shape)
-
         # Get the X and Y coord of pairs of words with sim > sim_threshold
-        Xs, Ys = np.where(corr_mat > 0.8)
+        Xs, Ys = np.where(corr_mat > self.max_corr)
         # Get the X coordinates of all coordinates where the Y is less than the X coord
         # This is done to only keep the second of each pair (We want to keep one word with this meaning existing at least!)
         words_idx_to_drop = Xs[Xs < Ys]
@@ -73,9 +73,6 @@ class NewsCluster:
         decorr_encode = encoding[:, ~corr_word_mask]
         # Apply bool mask to vocab
         decorr_vocab = vocab[~corr_word_mask]
-
-        print("Dropping:")
-        print(vocab[corr_word_mask])
 
         return decorr_encode, decorr_vocab
         
