@@ -70,6 +70,6 @@ class NewsDownloader:
         url_root = "https://news.google.com/rss/search?"
 
         print("Downloading news")
-        df_list = [self.get_news_df(url_root + url_param, lang, country) for url_param, lang, country in tqdm(url_params[:5])]
+        df_list = [self.get_news_df(url_root + url_param, lang, country) for url_param, lang, country in tqdm(url_params)]
 
         return pd.concat(df_list)

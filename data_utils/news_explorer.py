@@ -73,7 +73,7 @@ class NewsExplorer:
         # Remove stopwords from titles
         stopwords_set = stopwords(self.source_lang)
         stopwords_set.update(self.__get_punctuation_set())
-        self.news_df["words"] = self.news_df["words"].apply(lambda x: [w for w in x if not w in stopwords_set])
+        self.news_df["words"] = self.news_df["words"].apply(lambda x: [w for w in x if (not w in stopwords_set) and (len(w) > 1)])
 
     def get_news_clusters(self, num_topics=5):
         self.news_clusterings = NewsCluster(self.news_df, self.news_embeddings, num_topics)

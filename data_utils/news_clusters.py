@@ -10,6 +10,10 @@ import pytz
 class NewsCluster:
     def __init__(self, news_df, news_emb, num_topics = 5, num_char_headlines = 2, num_char_keywords = 6):
         assert num_topics > 1
+
+        self.num_char_keywords = num_char_keywords
+        self.num_char_headlines = num_char_headlines
+        self.max_corr = 0.2
         
         self.news_df = news_df
         self.news_emb = news_emb
@@ -17,7 +21,7 @@ class NewsCluster:
         # Cluster embeddings to get cluster IDs
         self.news_cluster = KMeans(n_clusters=num_topics, random_state=123).fit(news_emb)
         self.news_df["cluster_ids"] = self.news_cluster.predict(news_emb)
-        self.unique_cluster_ids = self.news_df["cluster_ids"]
+        self.unique_cluster_ids = self.news_df["cluster_ids"].unique()
         
         # Get TF-IDF weights for this cluster
         vectorizer = CountVectorizer(  
@@ -32,11 +36,6 @@ class NewsCluster:
         self.tfidf_values = vectorizer.fit_transform(self.news_df["words"].tolist())
         self.tfidf_words = vectorizer.get_feature_names_out()
         self.tfidf_values, self.tfidf_words = self.__decorrelate_vocab(self.tfidf_values.toarray(), self.tfidf_words)
-        self.num_char_keywords = num_char_keywords
-        
-        self.max_corr = 0.7
-
-        self.num_char_headlines = num_char_headlines
         
         # Get stats for the whole cluster
         self.entire_age = self.__get_cluster_mean_age(None)
@@ -120,7 +119,11 @@ class NewsCluster:
         sorted_words = self.tfidf_words[sorted_args]
         
         # Get top (i.e. highest tf-idf score) keywords for this cluster
-        return sorted_words[-self.num_char_keywords:]
+        top_keywords = sorted_words[-self.num_char_keywords:]
+        # Sort them backwards so that top is first, not last, in list
+        top_keywords = top_keywords[::-1]
+        
+        return top_keywords
     
     def __parse_num_to_readable(self, num):
 
