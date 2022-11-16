@@ -1,0 +1,15 @@
+notebook
+sklearn
+scipy
+numpy
+tqdm
+lxml
+pandas
+transformers
+sentence_transformers
+stopwordsiso
+six
+ipywidgets 
+widgetsnbextension 
+pandas-profiling
+fastparquet
