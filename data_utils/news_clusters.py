@@ -180,7 +180,7 @@ class NewsCluster:
         
         return self.__parse_num_to_readable(clust_size)
         
-    def __get_list_series_norm_freq(list_series):
+    def __get_list_series_norm_freq(self, list_series):
         mlb = MultiLabelBinarizer(sparse_output=True)
 
         one_hot_df = pd.DataFrame.sparse.from_spmatrix(
