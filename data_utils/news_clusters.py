@@ -1,14 +1,16 @@
 from sklearn.cluster import KMeans
 from scipy.spatial.distance import cdist
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.preprocessing import MultiLabelBinarizer
 import math
 from datetime import datetime
 import numpy as np
 import pandas as pd
 import pytz
+from IPython.core.display import display, HTML
 
 class NewsCluster:
-    def __init__(self, news_df, news_emb, num_topics = 5, num_char_headlines = 2, num_char_keywords = 6):
+    def __init__(self, news_df, news_emb, num_topics = 5, num_char_headlines = 3, num_char_keywords = 6):
         assert num_topics > 1
 
         self.num_char_keywords = num_char_keywords
@@ -41,6 +43,11 @@ class NewsCluster:
         self.entire_age = self.__get_cluster_mean_age(None)
         self.entire_size = self.__get_cluster_size(None)
         self.entire_stats = self.__get_cluster_stats(None)
+        
+        # English translations of language and country codes (TODO: CHANGE THIS TO BE MULTILINGUAL EVENTUALLY!)
+        self.lang_to_eng_name_dict = {'ar': 'Arabic', 'bn': 'Bengali', 'bg': 'Bulgarian', 'cs': 'Czech', 'de': 'German', 'el': 'Greek', 'en': 'English', 'fr': 'French', 'he': 'Hebrew', 'hi': 'Hindi', 'hu': 'Hungarian', 'id': 'Indonesian', 'it': 'Italian', 'ja': 'Japanese', 'ko': 'Korean', 'lv': 'Latvian', 'lt': 'Lithuanian', 'ml': 'Malayalam', 'mr': 'Marathi', 'nl': 'Dutch', 'no': 'Norwegian', 'pl': 'Polish', 'pt': 'Portuguese', 'ro': 'Romanian', 'ru': 'Russian', 'sk': 'Slovak', 'sl': 'Slovenian', 'es': 'Spanish', 'sr': 'Serbian', 'sv': 'Swedish', 'ta': 'Tamil', 'te': 'Telugu', 'th': 'Thai', 'tr': 'Turkish', 'uk': 'Ukrainian', 'vi': 'Vietnamese', 'zh': 'Chinese'}
+        self.country_to_eng_name_dict = {'AE': 'UAE', 'AR': 'Argentina', 'AT': 'Austria', 'AU': 'Australia', 'BD': 'Bangladesh', 'BE': 'Belgium', 'BG': 'Bulgaria', 'BR': 'Brazil', 'BW': 'Botswana', 'CA': 'Canada', 'CH': 'Switzerland', 'CL': 'Chile', 'CN': 'China', 'CO': 'Colombia', 'CU': 'Cuba', 'CZ': 'Czech Republic', 'DE': 'Germany', 'EG': 'Egypt', 'ES': 'Spain', 'ET': 'Ethiopia', 'FR': 'France', 'GB': 'UK', 'GH': 'Ghana', 'GR': 'Greece', 'HK': 'Hong Kong', 'HU': 'Hungary', 'ID': 'Indonesia', 'IE': 'Ireland', 'IL': 'Israel', 'IN': 'India', 'IT': 'Italy', 'JP': 'Japan', 'KE': 'Kenya', 'KR': 'South Korea', 'LB': 'Lebanon', 'LT': 'Lithuania', 'LV': 'Latvia', 'MA': 'Morocco', 'MX': 'Mexico', 'MY': 'Malaysia', 'NA': 'Namibia', 'NG': 'Nigeria', 'NL': 'Netherlands', 'NO': 'Norway', 'NZ': 'New Zealand', 'PE': 'Peru', 'PH': 'Philippines', 'PK': 'Pakistan', 'PL': 'Poland', 'PT': 'Portugal', 'RO': 'Romania', 'RS': 'Serbia', 'RU': 'Russia', 'SA': 'Saudi Arabia', 'SE': 'Sweden', 'SG': 'Singapore', 'SI': 'Slovenia', 'SK': 'Slovakia', 'SN': 'Senegal', 'TH': 'Thailand', 'TR': 'Turkey', 'TW': 'Taiwan', 'TZ': 'Tanzania', 'UA': 'Ukraine', 'UG': 'Uganda', 'US': 'USA', 'VE': 'Venezuela', 'VN': 'Viet Nam', 'ZA': 'South Africa', 'ZW': 'Zimbabwe'}
+
         
     def __decorrelate_vocab(self, encoding, vocab):
             
@@ -173,7 +180,17 @@ class NewsCluster:
         
         return self.__parse_num_to_readable(clust_size)
         
-    def __get_cluster_stats(self, cluster_id, stat_cols=["language", "source"], explode_cols=["countries"], n_stats=2):
+    def __get_list_series_norm_freq(list_series):
+        mlb = MultiLabelBinarizer(sparse_output=True)
+
+        one_hot_df = pd.DataFrame.sparse.from_spmatrix(
+                        mlb.fit_transform(list_series),
+                        index=list_series.index,
+                        columns=mlb.classes_)
+
+        return one_hot_df.mean().sort_values(ascending=False)
+        
+    def __get_cluster_stats(self, cluster_id, stat_cols=["language", "source"], explode_cols=["countries"], n_stats=3):
         if cluster_id is None:
             selected_news_df = self.news_df
         else:
@@ -186,7 +203,7 @@ class NewsCluster:
             cluster_stats[stat_col] = selected_news_df[stat_col].value_counts(normalize=True)[:n_stats].to_dict()
             
         for stat_col in explode_cols:
-            cluster_stats[stat_col] = selected_news_df[stat_col].explode().value_counts(normalize=True)[:n_stats].to_dict()
+            cluster_stats[stat_col] = self.__get_list_series_norm_freq(selected_news_df[stat_col])[:n_stats].to_dict()
             
         return cluster_stats
         
@@ -216,6 +233,71 @@ class NewsCluster:
             cluster_info[cluster_id]["all_news"] = self.__get_all_cluster_news(cluster_id)
     
         return cluster_info
+        
+    def __make_link(self, link, prefix, key):
+        return display(HTML(f"{prefix} <a href={link}>{key}</a>"))    
+
+    def print_article_list(self, article_list):
+
+        for article in article_list:
+            date_str = article["day_str"]
+            source_str = article["source"]
+            countries_str = ", ".join([self.country_to_eng_name_dict[x] for x in article["countries"]])
+            language_str = "[" + lang_to_eng_name_dict[article["language"]] + "] "
+            translated_headline = article["content_title"]
+            link = article["link"]
+
+            self.__make_link(link, language_str, translated_headline)
+            print(source_str + "      " + date_str + "      " + countries_str)
+            print()
+    
+    def print_stats(self, stats):
+        print("Top languages:")
+        for lang, freq in stats["language"].items():
+            print(f"{self.lang_to_eng_name_dict[lang]} - {freq * 100:.2f}%")
+        print()
+
+        print("Top countries:")
+        for country, freq in stats["countries"].items():
+            print(f"{self.country_to_eng_name_dict[country]} - {freq * 100:.2f}%")
+        print()
+
+        print("Top sources:")
+        for source, freq in stats["source"].items():
+            print(f"{source} - {freq * 100:.2f}%")
+        print()
+
+    def print_cluster_info(self, cluster_info):
+        
+        cluster_id = cluster_info["id"]
+        print(f"Cluster {cluster_id}")
+        print("Headlines:")
+        print("\n".join(["* " + x for x in cluster_info["headlines"]]))
+        print()
+        print("Average age of story:")
+        print(cluster_info["age"])
+        print()
+        print("Number of stories:")
+        print(cluster_info["size"])
+        print()
+        print("Keywords:")
+        print(", ".join(cluster_info["keywords"]))
+        print()
+        print_stats(cluster_info["stats"])
+        print()
+        
+    def print_all_articles(self):
+        self.print_article_list(self.news_df.to_dict(orient="records"))
+        
+    def print_all_stats(self):
+        self.print_stats(self.entire_stats)
+        
+    def print_all_cluster_info(self):
+        all_cluster_info = self.get_cluster_info()
+        for cluster_id, cluster_info in all_cluster_info.items():
+            print_cluster_info(cluster_info)
+            print()
+            print()
                 
     def get_subclusters(self, cluster_id, num_topics=5):
         

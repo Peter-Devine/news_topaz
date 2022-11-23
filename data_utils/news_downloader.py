@@ -59,7 +59,7 @@ class NewsDownloader:
         df["language"] = lang
         df["country"] = country
 
-        df["day_str"] = pd.to_datetime(df.pubDate).dt.strftime("%Y-%m-%d-%H-%M")
+        df["day_str"] = pd.to_datetime(df.pubDate).dt.strftime("%Y-%m-%d %H:%M")
 
         return df
     
