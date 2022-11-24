@@ -181,6 +181,7 @@ class NewsCluster:
         return self.__parse_num_to_readable(clust_size)
         
     def __get_list_series_norm_freq(self, list_series):
+        # Gets the relative frequency of values in a series of lists - NB it calculates per LIST not per exploded item.
         mlb = MultiLabelBinarizer(sparse_output=True)
 
         one_hot_df = pd.DataFrame.sparse.from_spmatrix(
@@ -283,7 +284,7 @@ class NewsCluster:
         print("Keywords:")
         print(", ".join(cluster_info["keywords"]))
         print()
-        print_stats(cluster_info["stats"])
+        self.print_stats(cluster_info["stats"])
         print()
         
     def print_all_articles(self):
@@ -295,7 +296,7 @@ class NewsCluster:
     def print_all_cluster_info(self):
         all_cluster_info = self.get_cluster_info()
         for cluster_id, cluster_info in all_cluster_info.items():
-            print_cluster_info(cluster_info)
+            self.print_cluster_info(cluster_info)
             print()
             print()
                 
