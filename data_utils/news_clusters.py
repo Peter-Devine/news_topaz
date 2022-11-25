@@ -244,7 +244,7 @@ class NewsCluster:
             date_str = article["day_str"]
             source_str = article["source"]
             countries_str = ", ".join([self.country_to_eng_name_dict[x] for x in article["countries"]])
-            language_str = "[" + lang_to_eng_name_dict[article["language"]] + "] "
+            language_str = "[" + self.lang_to_eng_name_dict[article["language"]] + "] "
             translated_headline = article["content_title"]
             link = article["link"]
 
