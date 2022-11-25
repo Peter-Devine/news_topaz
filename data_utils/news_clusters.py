@@ -194,7 +194,7 @@ class NewsCluster:
                         columns=mlb.classes_)
 
         return one_hot_df.mean().sort_values(ascending=False)
-        
+    
     def __get_keyword_stats(self, selected_news_df):
         zs_cols = [c for c in selected_news_df.columns if "_zs_cls" in c]
         
@@ -263,9 +263,18 @@ class NewsCluster:
             language_str = "[" + self.lang_to_eng_name_dict[article["language"]] + "] "
             translated_headline = article["content_title"]
             link = article["link"]
+            
+            zs_cols = sorted([c for c in article.keys() if "_zs_cls" in c])
+            
+            zs_keyword_str_list = [x[:-len("_zs_cls")] + ": " + f"{article[x]*100:.2f}%" for x in zs_cols]
+            zs_keyword_str = "  |  ".join(zs_keyword_str_list)
 
             self.__make_link(link, language_str, translated_headline)
             print(source_str + "      " + date_str + "      " + countries_str)
+            
+            if len(zs_keyword_str) > 0:
+                print(zs_keyword_str)
+            
             print()
     
     def print_stats(self, stats):
@@ -310,6 +319,11 @@ class NewsCluster:
         print()
         
     def print_all_articles(self):
+        zs_cols = sorted([c for c in self.news_df.columns if "_zs_cls" in c])
+        
+        for zs_col in zs_cols:
+            self.news_df = self.news_df.sort_values(zs_col, ascending=False)
+        
         self.print_article_list(self.news_df.to_dict(orient="records"))
         
     def print_all_stats(self):
