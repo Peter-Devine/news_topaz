@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pytz
 from IPython.core.display import display, HTML
+from transformers import pipeline
 
 class NewsCluster:
     def __init__(self, news_df, news_emb, num_topics = 5, num_char_headlines = 3, num_char_keywords = 6):
@@ -16,7 +17,7 @@ class NewsCluster:
         self.num_char_keywords = num_char_keywords
         self.num_char_headlines = num_char_headlines
         self.max_corr = 0.2
-        
+                
         self.news_df = news_df
         self.news_emb = news_emb
         
@@ -43,6 +44,9 @@ class NewsCluster:
         self.entire_age = self.__get_cluster_mean_age(None)
         self.entire_size = self.__get_cluster_size(None)
         self.entire_stats = self.__get_cluster_stats(None)
+        
+        # Initialize zero shot classifier for 'on the fly' classification
+        self.zs_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
         
         # English translations of language and country codes (TODO: CHANGE THIS TO BE MULTILINGUAL EVENTUALLY!)
         self.lang_to_eng_name_dict = {'ar': 'Arabic', 'bn': 'Bengali', 'bg': 'Bulgarian', 'cs': 'Czech', 'de': 'German', 'el': 'Greek', 'en': 'English', 'fr': 'French', 'he': 'Hebrew', 'hi': 'Hindi', 'hu': 'Hungarian', 'id': 'Indonesian', 'it': 'Italian', 'ja': 'Japanese', 'ko': 'Korean', 'lv': 'Latvian', 'lt': 'Lithuanian', 'ml': 'Malayalam', 'mr': 'Marathi', 'nl': 'Dutch', 'no': 'Norwegian', 'pl': 'Polish', 'pt': 'Portuguese', 'ro': 'Romanian', 'ru': 'Russian', 'sk': 'Slovak', 'sl': 'Slovenian', 'es': 'Spanish', 'sr': 'Serbian', 'sv': 'Swedish', 'ta': 'Tamil', 'te': 'Telugu', 'th': 'Thai', 'tr': 'Turkish', 'uk': 'Ukrainian', 'vi': 'Vietnamese', 'zh': 'Chinese'}
@@ -191,6 +195,16 @@ class NewsCluster:
 
         return one_hot_df.mean().sort_values(ascending=False)
         
+    def __get_keyword_stats(self, selected_news_df):
+        zs_cols = [c for c in selected_news_df.columns if "_zs_cls" in c]
+        
+        keyword_stats_dict = {}
+        
+        for zs_col in zs_cols:
+            keyword_name = zs_col[:-len("_zs_cls")]
+            keyword_stats_dict[keyword_name] = selected_news_df[zs_col].mean()
+        return keyword_stats_dict
+        
     def __get_cluster_stats(self, cluster_id, stat_cols=["language", "source"], explode_cols=["countries"], n_stats=3):
         if cluster_id is None:
             selected_news_df = self.news_df
@@ -205,6 +219,8 @@ class NewsCluster:
             
         for stat_col in explode_cols:
             cluster_stats[stat_col] = self.__get_list_series_norm_freq(selected_news_df[stat_col])[:n_stats].to_dict()
+            
+        cluster_stats["keywords"] = self.__get_keyword_stats(selected_news_df)
             
         return cluster_stats
         
@@ -267,6 +283,12 @@ class NewsCluster:
         for source, freq in stats["source"].items():
             print(f"{source} - {freq * 100:.2f}%")
         print()
+        
+        if len(stats["keywords"].keys()) > 0:
+            print("Search term avg. score:")
+            for keyword, score in stats["keywords"].items():
+                print(f"{keyword} - {score * 100:.2f}%")
+            print()
 
     def print_cluster_info(self, cluster_info):
         
@@ -292,6 +314,21 @@ class NewsCluster:
         
     def print_all_stats(self):
         self.print_stats(self.entire_stats)
+    
+    def clear_keyword_search(self):
+        self.news_df = self.news_df.drop([c for c in self.news_df.columns if "_zs_cls" in c], axis=1)
+    
+    def search_for_keywords(self, keywords):
+        zs_scores = self.zs_classifier(self.news_df.content_title.tolist(), keywords)
+        
+        zs_score_df = pd.DataFrame([{l: s for l, s in zip(item["labels"], item["scores"])} for item in zs_scores], index=self.news_df.index)
+        
+        zs_score_df.columns = [f"{c}_zs_cls" for c in zs_score_df.columns]
+        
+        self.clear_keyword_search()
+        
+        self.news_df = self.news_df.join(zs_score_df)
+        
         
     def print_all_cluster_info(self):
         all_cluster_info = self.get_cluster_info()
