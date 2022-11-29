@@ -9,6 +9,7 @@ import pandas as pd
 import pytz
 from IPython.core.display import display, HTML
 from transformers import pipeline
+from tqdm.notebook import trange
 
 class NewsCluster:
     def __init__(self, news_df, news_emb, num_topics = 5, num_char_headlines = 3, num_char_keywords = 6):
@@ -16,7 +17,8 @@ class NewsCluster:
 
         self.num_char_keywords = num_char_keywords
         self.num_char_headlines = num_char_headlines
-        self.max_corr = 0.2
+        self.max_corr = 0.3
+        self.zs_batch_size = 64
                 
         self.news_df = news_df
         self.news_emb = news_emb
@@ -332,8 +334,14 @@ class NewsCluster:
     def clear_keyword_search(self):
         self.news_df = self.news_df.drop([c for c in self.news_df.columns if "_zs_cls" in c], axis=1)
     
-    def search_for_keywords(self, keywords):
-        zs_scores = self.zs_classifier(self.news_df.content_title.tolist(), keywords)
+    def search_for_keywords(self, keywords, show_progress=True):
+        zs_scores = []
+        
+        iterator = trange if show_progress else range
+        
+        text_list = self.news_df.content_title.tolist()
+        for i in iterator(0, len(text_list), self.zs_batch_size):
+            zs_scores.extend(self.zs_classifier(text_list[i:i+self.zs_batch_size], keywords, batch_size = self.zs_batch_size))
         
         zs_score_df = pd.DataFrame([{l: s for l, s in zip(item["labels"], item["scores"])} for item in zs_scores], index=self.news_df.index)
         
