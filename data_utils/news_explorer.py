@@ -11,7 +11,11 @@ from data_utils.text_translator import TextTranslator
 from data_utils.news_clusters import NewsCluster
 
 class NewsExplorer:
-    def __init__(self, source_lang="en"):
+    def __init__(self, source_lang=None):
+        
+        if source_lang is None:
+            source_lang = self.__select_language()
+
         self.source_lang = source_lang
         self.text_translator = TextTranslator()
 
@@ -23,8 +27,25 @@ class NewsExplorer:
         self.news_df = None
         self.news_embeddings = None
         self.news_clusterings = None
+            
+    # Input the language for searching the news
+    def __select_language(self):
+        lang_to_name_dict = {'sv': 'svenska', 'ml': 'മലയാളം', 'ja': '日本語', 'uk': 'Українська мова', 'de': 'Deutsch', 'lv': 'Latviešu valoda', 'bn': 'বাংলা', 'hu': 'magyar nyelv', 'sr': 'српски', 'zh': '中文', 'it': 'italiano', 'sl': 'slovenski jezik', 'fr': 'français', 'cs': 'čeština', 'pt': 'português', 'es': 'español', 'lt': 'lietuvių kalba', 'th': 'ภาษาไทย', 'hi': 'हिन्दी', 'el': 'Νέα Ελληνικά', 'he': 'עברית', 'ru': 'русский язык', 'ko': '한국어', 'ar': 'العَرَبِيَّة', 'ta': 'தமிழ்', 'id': 'bahasa Indonesia', 'sk': 'slovenčina', 'pl': 'Język polski', 'nl': 'Nederlands', 'no': 'norsk', 'tr': 'Türkçe', 'bg': 'български език', 'en': 'English', 'vi': 'Tiếng Việt', 'mr': 'मराठी', 'te': 'తెలుగు', 'ro': 'limba română'}
+        
+        name_to_lang_dict = {n: l for l, n in lang_to_name_dict.items()}
+        lang_to_name_str = "\n".join([f"{n} ({l})" for l, n in lang_to_name_dict.items()])
+
+        source_lang = input(f"Display language:\n{lang_to_name_str}\n").lower()
+
+        lower_lang_names = [x.lower() for x in name_to_lang_dict.keys()]
+        source_lang = name_to_lang_dict[source_lang] if source_lang in lower_lang_names else source_lang
+
+        assert source_lang in self.lang_to_name_dict.keys(), f"Please select a supported language. {source_lang} is not supported"
+        
+        return source_lang
     
     def __get_punctuation_set(self):
+        # Get a list of all possible punctuation in unicode so we can discard them in keywords
         punct = set(chr(i) for i in range(sys.maxunicode) if unicodedata.category(chr(i)).startswith('P'))
         return punct.union(set("1234567890"))
     
@@ -34,6 +55,13 @@ class NewsExplorer:
         # We perform PCA to make the embeddings more relevant to the stories searched
         ipca_transformer = IncrementalPCA(n_components=None)
         return ipca_transformer.fit_transform(full_embeddings)
+        
+    def __isint(self, string):
+        try:
+            int(string)
+            return True
+        except:
+            return False
         
     def download_news(self, keyword):
         print("Getting news...")
@@ -78,3 +106,60 @@ class NewsExplorer:
     def get_news_clusters(self, num_topics=5):
         self.news_clusterings = NewsCluster(self.news_df, self.news_embeddings, num_topics)
         return self.news_clusterings
+    
+    def __take_command(self):
+        command_list = ["print_info", 
+                "print_articles", 
+                "print_stats", 
+                "keyword_search", 
+                "remove_keywords", 
+                "subcluster", 
+                "reset", 
+                "quit"]
+        
+        command_list_str = ",  ".join([f"{i}. {c}" for i, c in enumerate(command_list)])
+
+        command_str = input(f"Choose one of the following commands:\n\n{command_list_str}")
+
+        if self.__isint(command_str):
+            command_str = command_list[int(command_str)]
+
+        if command_str not in command_list:
+            print(f"Command ({command_str}) is not recognised!")
+            return take_command()
+
+        return command_str
+
+    
+    def explore(self):
+        # Interactive input based exploration of the clustered news, allowing for subclustering, printing of cluster summary, all cluster articles, all cluster stats, and searching for keywords.
+                
+        command = self.__take_command()
+
+        current_clustering = self.news_clusterings
+
+        while command.lower()[0] != "q":
+            if command == "print_info":
+                current_clustering.print_all_cluster_info()
+            if command == "print_articles":
+                current_clustering.print_all_articles()
+            if command == "print_stats":
+                current_clustering.print_all_stats()
+            if command == "keyword_search":
+                search_term = input("Please enter your search term: ")
+                current_clustering.search_for_keywords([search_term])
+            if command == "remove_keywords":
+                current_clustering.clear_keyword_search()
+            if command == "subcluster":
+                cluster_id = input("Please enter ID of cluster to subcluster:")
+
+                while not self.__isint(cluster_id):
+                    cluster_id = input("Please enter ID of cluster to subcluster:")
+
+                cluster_id = int(cluster_id)
+                subcluster = current_clustering.get_subclusters(cluster_id)
+                current_clustering = subcluster
+            if command == "reset":
+                current_clustering = self.news_clusterings
+
+            command = self.__take_command()
