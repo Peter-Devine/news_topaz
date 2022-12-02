@@ -106,17 +106,18 @@ class NewsExplorer:
     def get_news_clusters(self, num_topics=5):
         self.news_clusterings = NewsCluster(self.news_df, self.news_embeddings, num_topics)
         return self.news_clusterings
-    
+
     def __take_command(self):
-        command_list = ["print_info", 
-                "print_articles", 
-                "print_stats", 
-                "keyword_search", 
-                "remove_keywords", 
-                "subcluster", 
-                "reset", 
+        command_list = ["print_info",
+                "print_articles",
+                "print_stats",
+                "keyword_search",
+                "remove_keywords",
+                "subcluster",
+                "reset",
+                "export",
                 "quit"]
-        
+
         command_list_str = ",  ".join([f"{i}. {c}" for i, c in enumerate(command_list)])
 
         command_str = input(f"Choose one of the following commands:\n\n{command_list_str}")
@@ -130,15 +131,15 @@ class NewsExplorer:
 
         return command_str
 
-    
+
     def explore(self):
         # Interactive input based exploration of the clustered news, allowing for subclustering, printing of cluster summary, all cluster articles, all cluster stats, and searching for keywords.
-                
+
         command = self.__take_command()
 
         current_clustering = self.news_clusterings
 
-        while command.lower()[0] != "q":
+        while command != "quit":
             if command == "print_info":
                 current_clustering.print_all_cluster_info()
             if command == "print_articles":
@@ -146,8 +147,9 @@ class NewsExplorer:
             if command == "print_stats":
                 current_clustering.print_all_stats()
             if command == "keyword_search":
-                search_term = input("Please enter your search term: ")
-                current_clustering.search_for_keywords([search_term])
+                search_term = input("Please enter your search terms (comma separated if more than one): ")
+                search_terms = search_term.split(",")
+                current_clustering.search_for_keywords(search_terms)
             if command == "remove_keywords":
                 current_clustering.clear_keyword_search()
             if command == "subcluster":
@@ -161,5 +163,7 @@ class NewsExplorer:
                 current_clustering = subcluster
             if command == "reset":
                 current_clustering = self.news_clusterings
+            if command == "export":
+                current_clustering.export_cluster()
 
             command = self.__take_command()
