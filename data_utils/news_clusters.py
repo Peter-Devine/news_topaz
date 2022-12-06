@@ -280,49 +280,52 @@ class NewsCluster:
             print()
     
     def print_stats(self, stats):
-        print("Top languages:")
+        indent = "    "
+
+        print(indent + "Top languages:")
         for lang, freq in stats["language"].items():
-            print(f"{self.lang_to_eng_name_dict[lang]} - {freq * 100:.2f}%")
+            print(indent + f"{self.lang_to_eng_name_dict[lang]} - {freq * 100:.2f}%")
         print()
 
-        print("Top countries:")
+        print(indent + "Top countries:")
         for country, freq in stats["countries"].items():
-            print(f"{self.country_to_eng_name_dict[country]} - {freq * 100:.2f}%")
+            print(indent + f"{self.country_to_eng_name_dict[country]} - {freq * 100:.2f}%")
         print()
 
-        print("Top sources:")
+        print(indent + "Top sources:")
         for source, freq in stats["source"].items():
-            print(f"{source} - {freq * 100:.2f}%")
+            print(indent + f"{source} - {freq * 100:.2f}%")
         print()
         
         if len(stats["keywords"].keys()) > 0:
-            print("Search term avg. score:")
+            print(indent + "Search term avg. score:")
             for keyword, score in stats["keywords"].items():
-                print(f"{keyword} - {score * 100:.2f}%")
+                print(indent + f"{keyword} - {score * 100:.2f}%")
             print()
 
     def print_cluster_info(self, cluster_info):
         
         cluster_id = cluster_info["id"]
-        print(f"Cluster {cluster_id}")
-        print("Headlines:")
-        print("\n".join(["* " + x for x in cluster_info["headlines"]]))
+        print(f"########### Cluster {cluster_id} ###########")
+        indent = "    "
+        print(indent + "Headlines:")
+        print(indent + f"\n{indent}".join(["* " + x for x in cluster_info["headlines"]]))
         print()
-        print("Average age of story:")
-        print(cluster_info["age"])
+        print(indent + "Average age of story:")
+        print(indent + cluster_info["age"])
         print()
-        print("Number of stories:")
-        print(cluster_info["size"])
+        print(indent + "Number of stories:")
+        print(indent + cluster_info["size"])
         print()
-        print("Keywords:")
-        print(", ".join(cluster_info["keywords"]))
+        print(indent + "Keywords:")
+        print(indent + ", ".join(cluster_info["keywords"]))
         print()
         self.print_stats(cluster_info["stats"])
         print()
         
     def print_all_articles(self):
-        zs_cols = sorted([c for c in self.news_df.columns if "_zs_cls" in c])
-        
+        zs_cols = [c for c in self.news_df.columns if "_zs_cls" in c]
+
         for zs_col in zs_cols:
             self.news_df = self.news_df.sort_values(zs_col, ascending=False)
         
@@ -341,8 +344,8 @@ class NewsCluster:
         
         text_list = self.news_df.content_title.tolist()
         for i in iterator(0, len(text_list), self.zs_batch_size):
-            zs_scores.extend(self.zs_classifier(text_list[i:i+self.zs_batch_size], keywords, batch_size = self.zs_batch_size))
-        
+            zs_scores.extend(self.zs_classifier(text_list[i:i+self.zs_batch_size], keywords, batch_size = self.zs_batch_size, multi_class=True))
+
         zs_score_df = pd.DataFrame([{l: s for l, s in zip(item["labels"], item["scores"])} for item in zs_scores], index=self.news_df.index)
         
         zs_score_df.columns = [f"{c}_zs_cls" for c in zs_score_df.columns]
@@ -358,7 +361,10 @@ class NewsCluster:
             self.print_cluster_info(cluster_info)
             print()
             print()
-                
+
+    def export_cluster(self, name="news_clusters.csv"):
+        self.news_df.to_csv(name)
+
     def get_subclusters(self, cluster_id, num_topics=5):
         
         cluster_mask = self.news_df["cluster_ids"] == cluster_id
