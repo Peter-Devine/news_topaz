@@ -27,6 +27,8 @@ class NewsExplorer:
         self.news_df = None
         self.news_embeddings = None
         self.news_clusterings = None
+        
+        self.pca_dims = 50
             
     # Input the language for searching the news
     def __select_language(self):
@@ -53,7 +55,7 @@ class NewsExplorer:
         full_embeddings = self.embedding_model.encode(text_list, show_progress_bar = True)
         
         # We perform PCA to make the embeddings more relevant to the stories searched
-        ipca_transformer = IncrementalPCA(n_components=None)
+        ipca_transformer = IncrementalPCA(n_components=self.pca_dims)
         return ipca_transformer.fit_transform(full_embeddings)
         
     def __isint(self, string):
