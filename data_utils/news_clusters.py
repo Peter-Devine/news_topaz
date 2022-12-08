@@ -10,6 +10,7 @@ import pytz
 from IPython.core.display import display, HTML
 from transformers import pipeline
 from tqdm.notebook import trange
+import torch
 
 class NewsCluster:
     def __init__(self, news_df, news_emb, num_topics = 5, num_char_headlines = 3, num_char_keywords = 6):
@@ -26,7 +27,8 @@ class NewsCluster:
         # Cluster embeddings to get cluster IDs
         self.news_cluster = KMeans(n_clusters=num_topics, random_state=123).fit(news_emb)
         self.news_df["cluster_ids"] = self.news_cluster.predict(news_emb)
-        self.unique_cluster_ids = self.news_df["cluster_ids"].unique()
+        self.news_df = self.__sort_clust_ids_by_date(self.news_df)
+        self.unique_cluster_ids = sorted(self.news_df["cluster_ids"].unique())
         
         # Get TF-IDF weights for this cluster
         vectorizer = CountVectorizer(  
@@ -45,16 +47,23 @@ class NewsCluster:
         # Get stats for the whole cluster
         self.entire_age = self.__get_cluster_mean_age(None)
         self.entire_size = self.__get_cluster_size(None)
-        self.entire_stats = self.__get_cluster_stats(None)
+        self.entire_stats = self.__get_cluster_stats(None, n_stats=10)
         
         # Initialize zero shot classifier for 'on the fly' classification
-        self.zs_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+        self.zs_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli", device="cuda:0" if torch.cuda.is_available() else "cpu")
         
         # English translations of language and country codes (TODO: CHANGE THIS TO BE MULTILINGUAL EVENTUALLY!)
         self.lang_to_eng_name_dict = {'ar': 'Arabic', 'bn': 'Bengali', 'bg': 'Bulgarian', 'cs': 'Czech', 'de': 'German', 'el': 'Greek', 'en': 'English', 'fr': 'French', 'he': 'Hebrew', 'hi': 'Hindi', 'hu': 'Hungarian', 'id': 'Indonesian', 'it': 'Italian', 'ja': 'Japanese', 'ko': 'Korean', 'lv': 'Latvian', 'lt': 'Lithuanian', 'ml': 'Malayalam', 'mr': 'Marathi', 'nl': 'Dutch', 'no': 'Norwegian', 'pl': 'Polish', 'pt': 'Portuguese', 'ro': 'Romanian', 'ru': 'Russian', 'sk': 'Slovak', 'sl': 'Slovenian', 'es': 'Spanish', 'sr': 'Serbian', 'sv': 'Swedish', 'ta': 'Tamil', 'te': 'Telugu', 'th': 'Thai', 'tr': 'Turkish', 'uk': 'Ukrainian', 'vi': 'Vietnamese', 'zh': 'Chinese'}
         self.country_to_eng_name_dict = {'AE': 'UAE', 'AR': 'Argentina', 'AT': 'Austria', 'AU': 'Australia', 'BD': 'Bangladesh', 'BE': 'Belgium', 'BG': 'Bulgaria', 'BR': 'Brazil', 'BW': 'Botswana', 'CA': 'Canada', 'CH': 'Switzerland', 'CL': 'Chile', 'CN': 'China', 'CO': 'Colombia', 'CU': 'Cuba', 'CZ': 'Czech Republic', 'DE': 'Germany', 'EG': 'Egypt', 'ES': 'Spain', 'ET': 'Ethiopia', 'FR': 'France', 'GB': 'UK', 'GH': 'Ghana', 'GR': 'Greece', 'HK': 'Hong Kong', 'HU': 'Hungary', 'ID': 'Indonesia', 'IE': 'Ireland', 'IL': 'Israel', 'IN': 'India', 'IT': 'Italy', 'JP': 'Japan', 'KE': 'Kenya', 'KR': 'South Korea', 'LB': 'Lebanon', 'LT': 'Lithuania', 'LV': 'Latvia', 'MA': 'Morocco', 'MX': 'Mexico', 'MY': 'Malaysia', 'NA': 'Namibia', 'NG': 'Nigeria', 'NL': 'Netherlands', 'NO': 'Norway', 'NZ': 'New Zealand', 'PE': 'Peru', 'PH': 'Philippines', 'PK': 'Pakistan', 'PL': 'Poland', 'PT': 'Portugal', 'RO': 'Romania', 'RS': 'Serbia', 'RU': 'Russia', 'SA': 'Saudi Arabia', 'SE': 'Sweden', 'SG': 'Singapore', 'SI': 'Slovenia', 'SK': 'Slovakia', 'SN': 'Senegal', 'TH': 'Thailand', 'TR': 'Turkey', 'TW': 'Taiwan', 'TZ': 'Tanzania', 'UA': 'Ukraine', 'UG': 'Uganda', 'US': 'USA', 'VE': 'Venezuela', 'VN': 'Viet Nam', 'ZA': 'South Africa', 'ZW': 'Zimbabwe'}
-
-        
+    
+    # Sort cluster IDs by average date of story (i.e. make 0 cluster the newest on average, 1 the second newest on average etc)
+    def __sort_clust_ids_by_date(self, df):
+        df["pubDate"] = pd.to_datetime(df["pubDate"])
+        sorted_idx = df.groupby("cluster_ids")["pubDate"].mean().sort_values(ascending=False).index
+        idx_map = {old_idx: new_idx for old_idx, new_idx in enumerate(sorted_idx)}
+        df["cluster_ids"] = df["cluster_ids"].map(idx_map)
+        return df
+    
     def __decorrelate_vocab(self, encoding, vocab):
             
         # Get correlations between each row (i.e. each word)
@@ -344,7 +353,7 @@ class NewsCluster:
         
         text_list = self.news_df.content_title.tolist()
         for i in iterator(0, len(text_list), self.zs_batch_size):
-            zs_scores.extend(self.zs_classifier(text_list[i:i+self.zs_batch_size], keywords, batch_size = self.zs_batch_size, multi_class=True))
+            zs_scores.extend(self.zs_classifier(text_list[i:i+self.zs_batch_size], keywords, batch_size = self.zs_batch_size, multi_label=True))
 
         zs_score_df = pd.DataFrame([{l: s for l, s in zip(item["labels"], item["scores"])} for item in zs_scores], index=self.news_df.index)
         

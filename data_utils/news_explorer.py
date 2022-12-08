@@ -28,7 +28,7 @@ class NewsExplorer:
         self.news_embeddings = None
         self.news_clusterings = None
         
-        self.pca_dims = 50
+        self.pca_dims = 25
             
     # Input the language for searching the news
     def __select_language(self):
@@ -122,7 +122,7 @@ class NewsExplorer:
 
         command_list_str = ",  ".join([f"{i}. {c}" for i, c in enumerate(command_list)])
 
-        command_str = input(f"Choose one of the following commands:\n\n{command_list_str}")
+        command_str = input(f"Choose one of the following commands:\n\n{command_list_str}\n")
 
         if self.__isint(command_str):
             command_str = command_list[int(command_str)]
