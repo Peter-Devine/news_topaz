@@ -52,6 +52,8 @@ class NewsCluster:
         # Initialize zero shot classifier for 'on the fly' classification
         if zs_classifier is None:
             self.zs_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli", device="cuda:0" if torch.cuda.is_available() else "cpu")
+        else:
+            self.zs_classifier = zs_classifier
         
         # English translations of language and country codes (TODO: CHANGE THIS TO BE MULTILINGUAL EVENTUALLY!)
         self.lang_to_eng_name_dict = {'ar': 'Arabic', 'bn': 'Bengali', 'bg': 'Bulgarian', 'cs': 'Czech', 'de': 'German', 'el': 'Greek', 'en': 'English', 'fr': 'French', 'he': 'Hebrew', 'hi': 'Hindi', 'hu': 'Hungarian', 'id': 'Indonesian', 'it': 'Italian', 'ja': 'Japanese', 'ko': 'Korean', 'lv': 'Latvian', 'lt': 'Lithuanian', 'ml': 'Malayalam', 'mr': 'Marathi', 'nl': 'Dutch', 'no': 'Norwegian', 'pl': 'Polish', 'pt': 'Portuguese', 'ro': 'Romanian', 'ru': 'Russian', 'sk': 'Slovak', 'sl': 'Slovenian', 'es': 'Spanish', 'sr': 'Serbian', 'sv': 'Swedish', 'ta': 'Tamil', 'te': 'Telugu', 'th': 'Thai', 'tr': 'Turkish', 'uk': 'Ukrainian', 'vi': 'Vietnamese', 'zh': 'Chinese'}
