@@ -119,12 +119,12 @@ class NewsCluster:
         sorted_headline_to_centroid = selected_news_df.content_title.iloc[distances.argsort()].tolist()
 
         # Take the top third of the characteristic headlines
-        selected_len = int(len(sorted_headline_to_centroid) / 3)
+        selected_len = int(len(sorted_headline_to_centroid) / 3) + 1
         selected_headlines = sorted_headline_to_centroid[:selected_len]
 
         sample_idx = [int(selected_len * (i / self.num_char_headlines)) for i in range(self.num_char_headlines)]
 
-        chosen_headlines = [selected_headlines[idx] for idx in sample_idx]
+        chosen_headlines = [selected_headlines[min(idx, len(selected_headlines) - 1)] for idx in sample_idx]
                         
         return chosen_headlines
        
